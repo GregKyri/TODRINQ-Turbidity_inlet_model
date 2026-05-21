@@ -53,7 +53,7 @@ def main(my_stream_data):
         choice = input("Select a model to run (1-5): ").strip()
 
         if choice == '1':
-            load_dir = "trained_models/RF models/Classification/Sensorturb_12features_3_85"
+            load_dir = "Sensorturb_12features_3_85"
             model_name = "rfclass_sensorturb_12features_3_85.joblib"
 
 
@@ -68,7 +68,7 @@ def main(my_stream_data):
             print(f"Result: {result}")
 
         elif choice == '2':
-            load_dir = "trained_models/XGB models/Sensorturb_sensortemp_hagdis_18features_1/"
+            load_dir = "Sensorturb_sensortemp_hagdis_18features_1/"
             model_name = "xgb_sensorturb_sensortemp_hagdis_18features_6.joblib"
 
             feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
@@ -81,7 +81,7 @@ def main(my_stream_data):
             print(f"Result: {result}")
 
         elif choice == '3':
-            load_dir = "trained_models/XGB models/Sensorturb_sensortemp_hagdis_18features_3/"
+            load_dir = "Sensorturb_sensortemp_hagdis_18features_3/"
             model_name = "xgb_sensorturb_sensortemp_hagdis_18features_6.joblib" # Verify if name should be _3.joblib
 
             feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
@@ -94,7 +94,7 @@ def main(my_stream_data):
             print(f"Result: {result}")
 
         elif choice == '4':
-            load_dir = "trained_models/XGB models/Sensorturb_sensortemp_hagdis_18features_6/"
+            load_dir = "Sensorturb_sensortemp_hagdis_18features_6/"
             model_name = "xgb_sensorturb_sensortemp_hagdis_18features_6.joblib"
 
             feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
