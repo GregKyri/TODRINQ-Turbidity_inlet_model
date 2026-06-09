@@ -7,35 +7,47 @@ Original file is located at
     https://colab.research.google.com/drive/1lsBetSk-x3plqz-u8TiZA_ADJB7BT9VU
 """
 
+# Commented out IPython magic to ensure Python compatibility.
+from google.colab import drive
+drive.mount("/content/drive", force_remount=True)
+# %cd "/content/drive/My Drive/Colab Notebooks/Turbidity model - Hang_s thesis/ML_turbidity_prediction-main"
+
 import time
 import os
 import json
 import joblib
 import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
-from prepare data and run models import run_regression_model, run_classification_model,shift_features_for_horizon
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from prepare_data_and_run_models import run_regression_model, run_classification_model,shift_features_for_horizon
 
 
 def main(my_stream_data):
-   feature_names = [
+    feature_names = [
         "sensor_turbidity","sensor_turbidity_lag1", "sensor_turbidity_lag2", "sensor_turbidity_lag3", "sensor_turbidity_lag4", "sensor_turbidity_lag5",
         "sensor_turbidity_lag6", "sensor_turbidity_lag7", "sensor_turbidity_lag8", "sensor_turbidity_lag9", "sensor_turbidity_lag10",
         "sensor_turbidity_lag11", "sensor_turbidity_lag12", "sensor_turbidity_lag13", "sensor_turbidity_lag14", "sensor_turbidity_lag15",
         "sensor_turbidity_lag16", "sensor_turbidity_lag17", "sensor_turbidity_lag18", "sensor_turbidity_lag19", "sensor_turbidity_lag20",
-        "sensor_turbidity_lag21", "sensor_turbidity_lag22", "sensor_turbidity_lag23", "Hag_dis", "Hag_dis_lag1","Hag_dis_lag2",
+        "sensor_turbidity_lag21", "sensor_turbidity_lag22", "sensor_turbidity_lag23", "sensor_turbidity_lag24", "sensor_turbidity_lag25",
+        "sensor_turbidity_lag26", "sensor_turbidity_lag27", "sensor_turbidity_lag28", "sensor_turbidity_lag29", "sensor_turbidity_lag30",
+        "Hag_dis", "Hag_dis_lag1","Hag_dis_lag2",
         "Hag_dis_lag3", "Hag_dis_lag4", "Hag_dis_lag5", "Hag_dis_lag6", "Hag_dis_lag7", "Hag_dis_lag8", "Hag_dis_lag9", "Hag_dis_lag10",
         "Hag_dis_lag11", "Hag_dis_lag12", "Hag_dis_lag13", "Hag_dis_lag14", "Hag_dis_lag15", "Hag_dis_lag16", "Hag_dis_lag17", "Hag_dis_lag18",
-        "Hag_dis_lag19", "Hag_dis_lag20", "Hag_dis_lag21", "Hag_dis_lag22", "Hag_dis_lag23", "sensor_temperature","sensor_temperature_lag1",
+        "Hag_dis_lag19", "Hag_dis_lag20", "Hag_dis_lag21", "Hag_dis_lag22", "Hag_dis_lag23", "Hag_dis_lag24", "Hag_dis_lag25",
+        "Hag_dis_lag26", "Hag_dis_lag27", "Hag_dis_lag28", "Hag_dis_lag29", "Hag_dis_lag30",
+        "sensor_temperature","sensor_temperature_lag1",
         "sensor_temperature_lag2", "sensor_temperature_lag3", "sensor_temperature_lag4", "sensor_temperature_lag5", "sensor_temperature_lag6",
         "sensor_temperature_lag7", "sensor_temperature_lag8", "sensor_temperature_lag9", "sensor_temperature_lag10", "sensor_temperature_lag11",
         "sensor_temperature_lag12", "sensor_temperature_lag13", "sensor_temperature_lag14", "sensor_temperature_lag15", "sensor_temperature_lag16",
         "sensor_temperature_lag17", "sensor_temperature_lag18", "sensor_temperature_lag19", "sensor_temperature_lag20", "sensor_temperature_lag21",
-        "sensor_temperature_lag22", "sensor_temperature_lag23","month", "month_lag1", "month_lag2", "month_lag3", "month_lag4",
+        "sensor_temperature_lag22", "sensor_temperature_lag23","sensor_temperature_lag24", "sensor_temperature_lag25",
+        "sensor_temperature_lag26", "sensor_temperature_lag27", "sensor_temperature_lag28", "sensor_temperature_lag29", "sensor_temperature_lag30",
+        "month", "month_lag1", "month_lag2", "month_lag3", "month_lag4",
         "month_lag5", "month_lag6", "month_lag7", "month_lag8", "month_lag9", "month_lag10", "month_lag11", "month_lag12", "month_lag13", "month_lag14",
         "month_lag15", "month_lag16", "month_lag17", "month_lag18", "month_lag19", "month_lag20", "month_lag21", "month_lag22", "month_lag23",
+        "month_lag24", "month_lag25", "month_lag26", "month_lag27", "month_lag28", "month_lag29", "month_lag30"
     ]
-    my_stream_data=pd.DataFrame(columns=feature_names)
+    my_stream_data=pd.DataFrame([my_stream_data],columns=feature_names)
     # Shared base scaler directory
 
 
@@ -64,12 +76,12 @@ def main(my_stream_data):
 
 
             prepared_data = shift_features_for_horizon(my_stream_data, horizon_hours=3)
-            result = run_classification_model(sample_input_data, rf_model, scaler_dict, feature_cols)
+            result = run_classification_model(prepared_data, rf_model, scaler_dict, feature_cols)
             print(f"Result: {result}")
 
         elif choice == '2':
-            load_dir = "Sensorturb_sensortemp_hagdis_18features_1/"
-            model_name = "xgb_sensorturb_sensortemp_hagdis_18features_6.joblib"
+            load_dir = "Sensorturb_sensortemp_hagdis_month_24_1/"
+            model_name = "xgb_sensor_hagdis_month_24_1.joblib"
 
             feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
             config = json.load(open(os.path.join(load_dir, "config.json")))
@@ -81,8 +93,8 @@ def main(my_stream_data):
             print(f"Result: {result}")
 
         elif choice == '3':
-            load_dir = "Sensorturb_sensortemp_hagdis_18features_3/"
-            model_name = "xgb_sensorturb_sensortemp_hagdis_18features_6.joblib" # Verify if name should be _3.joblib
+            load_dir = "Sensorturb_sensortemp_hagdis_month_24_3/"
+            model_name = "xgb_sensor_hagdis_month_24_3.joblib" # Verify if name should be _3.joblib
 
             feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
             config = json.load(open(os.path.join(load_dir, "config.json")))
@@ -90,7 +102,8 @@ def main(my_stream_data):
             xgb_model = joblib.load(os.path.join(load_dir, model_name))
 
             prepared_data = shift_features_for_horizon(my_stream_data, horizon_hours=3)
-            result = run_regression_model(sample_input_data, xgb_model, scaler_dict, feature_cols, "3-Hour")
+            prepared_data = prepared_data.reindex(columns=feature_cols, fill_value=np.nan)
+            result = run_regression_model(prepared_data, xgb_model, scaler_dict, feature_cols, "3-Hour")
             print(f"Result: {result}")
 
         elif choice == '4':
@@ -103,7 +116,14 @@ def main(my_stream_data):
             xgb_model = joblib.load(os.path.join(load_dir, model_name))
 
             prepared_data = shift_features_for_horizon(my_stream_data, horizon_hours=6)
-            result = run_regression_model(sample_input_data, xgb_model, scaler_dict, feature_cols, "6-Hour")
+            # Ensure prepared_data is a DataFrame before passing it to run_regression_model
+            if isinstance(prepared_data, dict):
+                prepared_data = pd.DataFrame([prepared_data])
+            elif not isinstance(prepared_data, pd.DataFrame):
+                raise TypeError("Expected prepared_data to be a pandas DataFrame or a dictionary for a single row, but got type: " + str(type(prepared_data)))
+            # Ensure prepared_data has all expected feature_cols, adding NaN for missing ones
+            prepared_data = prepared_data.reindex(columns=feature_cols, fill_value=np.nan)
+            result = run_regression_model(prepared_data, xgb_model, scaler_dict, feature_cols, "6-Hour")
             print(f"Result: {result}")
 
         elif choice == '5':
@@ -120,17 +140,17 @@ def main(my_stream_data):
 if __name__ == "__main__":
     # Your live dataset from a SCADA system, database, or API
     my_stream_data = {
-        "SCADA_Turbidity_Value": 2.5,
-        "Discharge_Hag_m3s": 152.1,
-        "Water_Temp_Celsius": 18.9,
-        "Current_Month_Num": 5
+        "sensor_turbidity": 13.5, # Changed key name
+        "Hag_dis": 152.1,         # Changed key name
+        "sensor_temperature": 18.9, # Changed key name
+        "month": 5                # Changed key name
     }
     # (Populating lags for local script testing)
-    for i in range(1, 23):
-        my_stream_data[f"SCADA_Turbidity_Value_lag{i}"] = 2.0
-        my_stream_data[f"Discharge_Hag_m3s_lag{i}"] = 148.0
-        my_stream_data[f"Water_Temp_Celsius_lag{i}"] = 18.2
-        my_stream_data[f"Current_Month_Num_lag{i}"] = 5
+    for i in range(1, 25): # Increased range to generate lags up to 30
+        my_stream_data[f"sensor_turbidity_lag{i}"] = 1.1 * i +0.23 + 13.5 # Changed key name
+        my_stream_data[f"Hag_dis_lag{i}"] = 0.98 * i - 0.12 + 152.1         # Changed key name
+        my_stream_data[f"sensor_temperature_lag{i}"] = 1.02 * i - 0.03 + 18.9 # Changed key name
+        my_stream_data[f"month_lag{i}"] = 5                          # Changed key name
 
     prediction_output = main(my_stream_data)
 
