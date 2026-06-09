@@ -7,44 +7,44 @@ Original file is located at
     https://colab.research.google.com/drive/1fLaKrI3zRv5_VQg0N75gA61c6h__PjEn
 """
 
-def shift_features_for_horizon(incoming_data, horizon_hours):
-    """
-    Shifts live time-series feature keys to match their historical lag equivalents
-    based on the predictive horizon.
+import pandas as pd
+import numpy as np
 
-    Example for a 3-hour horizon:
-      'sensor_turbidity'      -> 'sensor_turbidity_lag3'
-      'sensor_turbidity_lag1' -> 'sensor_turbidity_lag4'
+def shift_features_for_horizon(df, horizon_hours):
     """
-    shifted_data = {}
+    Shifts live time-series feature columns to match their historical lag
+    equivalents based on the predictive horizon in a DataFrame.
+    """
+    rename_map = {}
 
-    for key, value in incoming_data.items():
-        # Split by '_lag' to separate the base feature name from its index number
-        if "_lag" in key:
-            base_name, current_lag = key.split("_lag")
-            new_lag = int(current_lag) + horizon_hours
-            new_key = f"{base_name}_lag{new_lag}"
+    for col in df.columns:
+        if "_lag" in col:
+            # Extract base name and current lag index
+            base_name, current_lag = col.rsplit("_lag", 1)
+            new_key = f"{base_name}_lag{int(current_lag) + horizon_hours}"
         else:
-            # This is the current/live step (e.g., 'sensor_turbidity')
-            new_key = f"{key}_lag{horizon_hours}"
+            # Handle the base column (e.g., 'sensor_turbidity' -> 'sensor_turbidity_lag3')
+            new_key = f"{col}_lag{horizon_hours}"
 
-        shifted_data[new_key] = value
+        rename_map[col] = new_key
 
-    return shifted_data
+    return df.rename(columns=rename_map)
 
 def run_classification_model(data, model, scaler_dict, feature_cols):
     print("\n[Running Classification Model...]")
 
     # 1. Convert your input data dictionary into a DataFrame matching model features
-    df = pd.DataFrame([data])
-    df = df[feature_cols]  # Ensure columns match the training order
-
+    df = data[feature_cols]  # Ensure columns match the training order
+    df_scaled = df.copy()
     # 2. Scale your data if your model configuration requires it
-    # (Assuming you need to scale. Adjust based on your 'config.json')
-    # df_scaled = scaler_dict['scaler'].transform(df)
+    for key, scaler in scaler_dict.items():
+        # Check if the scaler key exists in your feature columns
+        # This assumes your scaler keys match the column names or logical groups
+        if key in df.columns:
+            df_scaled[[key]] = scaler.transform(df[[key]])
 
     # 3. Make the actual prediction
-    prediction = model.predict(df)[0]
+    prediction = model.predict(df_scaled)[0]
 
     # Check if predict_proba is available for confidence
     if hasattr(model, "predict_proba"):
@@ -58,10 +58,17 @@ def run_regression_model(data, model, scaler_dict, feature_cols, horizon_name):
     print(f"\n[Running Regression Model for {horizon_name} Horizon...]")
 
     # 1. Convert input data to match features
-    df = pd.DataFrame([data])
-    df = df[feature_cols]
+    df = data[feature_cols]
+    df_scaled = df.copy()
+    # 2. Scale your data if your model configuration requires it
+    for key, scaler in scaler_dict.items():
+        if key in df.columns:
+            df_scaled[[key]] = scaler.transform(df[[key]])
 
     # 2. Make the actual prediction
-    prediction = model.predict(df)[0]
+    prediction_scaled = model.predict(df_scaled)[0]
 
-    return f"Predicted Value for {horizon_name}: {prediction:.4f}"
+    # 3. Convert prediction to real turbidity data.
+    prediction_scaled = prediction_scaled.reshape(-1, 1)
+    prediction = scaler_dict['sensor_turbidity'].inverse_transform(prediction_scaled).flatten()
+    return f"Predicted Value for {horizon_name}: {prediction[0]:.4f}"
