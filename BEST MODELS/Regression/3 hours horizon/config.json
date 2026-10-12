@@ -1,0 +1,61 @@
+{
+  "model": "rf",
+  "split_mode": "random",
+  "split": "RANDOM 80/20 over windows (seed=42)",
+  "split_note": "test windows interleaved with training windows; every test hour has temporal neighbours in training -- read as reconstruction / gap-filling, not forecasting",
+  "target": "log1p(sensor_turbidity)",
+  "metrics_space": "FTU",
+  "master_window_hours": 24,
+  "tree_lag_offsets": [
+    1,
+    2,
+    3,
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "n_input_columns": 56,
+  "forecasting horizon (hours)": 3,
+  "feature_columns": [
+    "sensor_turbidity",
+    "Hag_dis",
+    "sensor_temperature",
+    "Nieu_EC",
+    "Lob_turbidity",
+    "flow_direction",
+    "month"
+  ],
+  "best_params": {
+    "n_estimators": 400,
+    "min_samples_split": 5,
+    "min_samples_leaf": 1,
+    "max_samples": 0.5,
+    "max_features": "sqrt",
+    "max_depth": null
+  },
+  "test_metrics": {
+    "model": "RF",
+    "n": 6948,
+    "RMSE_FTU": 3.9463069947355573,
+    "MAE_FTU": 2.2161950119894973,
+    "R2": 0.7333287764981631,
+    "bias_FTU": -0.3210351992994869,
+    "PBIAS_pct": -2.0096395567939953,
+    "corr": 0.8596173141376623,
+    "KGE": 0.7528481102874987,
+    "KGE_alpha": 0.797582379759781,
+    "KGE_beta": 0.97990360443206,
+    "peak95_MAE": 8.072308657014625,
+    "peak95_bias": -7.078434326957641,
+    "skill_vs_persistence": 0.3496340534571173
+  },
+  "cv_fold_val_rmse": [
+    0.051288456888556946,
+    0.05183663026338261,
+    0.05295486171660055,
+    0.054010565548360756,
+    0.05409833716835133
+  ]
+}
