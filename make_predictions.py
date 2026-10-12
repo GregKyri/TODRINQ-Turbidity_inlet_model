@@ -12,146 +12,148 @@ from google.colab import drive
 drive.mount("/content/drive", force_remount=True)
 # %cd "/content/drive/My Drive/Colab Notebooks/Turbidity model - Hang_s thesis/ML_turbidity_prediction-main"
 
-import time
 import os
 import json
 import joblib
 import pandas as pd
-import numpy as np
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from prepare_data_and_run_models import run_regression_model, run_classification_model,shift_features_for_horizon
+from prepare_data_and_run_models import run_regression_model, run_classification_model
+
+BASE_DIR = "BEST MODELS/"
+
+# One entry per menu option: (label, task, horizon, model dir, model file, scaler file)
+MODELS = {
+    "1": ("Classification Model (3 hours predictive horizon)", "classification", 3,
+          "Classification/3 hours horizon/",
+          "best_classifier_h3_xgb_weight_clf_block30d80_L1-2-3-20-21-22-23-24_f7_P90_r3.joblib",
+          "scaler_dict_random80_w24-treeL1-2-3-20-21-22-23-24_h3_f7.pkl"),
+    "2": ("Classification Model (6 hours predictive horizon)", "classification", 6,
+          "Classification/6 hours horizon/",
+          "best_classifier_h6_rf_none_clf_block30d80_L1-2-3-20-21-22-23-24_f7_P90_r3.joblib",
+          "scaler_dict_random80_w24-treeL1-2-3-20-21-22-23-24_h6_f7.pkl"),
+    "3": ("Regression Model (3 hours predictive horizon)", "regression", 3,
+          "Regression/3 hours horizon/",
+          "rf_random80_L1-2-3-20-21-22-23-24_h3.joblib",
+          "scaler_dict_random80_w24-treeL1-2-3-20-21-22-23-24_h3_f7.pkl"),
+    "4": ("Regression Model (6 hours predictive horizon)", "regression", 6,
+          "Regression/6 hours horizon/",
+          "xgb_random80_L1-2-3-20-21-22-23-24_h6.joblib",
+          "scaler_dict_random80_w24-treeL1-2-3-20-21-22-23-24_h6_f7.pkl"),
+}
+EXIT_CHOICE = "5"
+
+
+def load_feature_cols():
+    with open(os.path.join(BASE_DIR, "features.json")) as f:
+        return json.load(f)
+
+
+def check_feature_names(stream_data, feature_cols):
+    """Warn about key mismatches; pandas would otherwise silently fill them with NaN."""
+    missing = sorted(set(feature_cols) - set(stream_data))
+    unexpected = sorted(set(stream_data) - set(feature_cols))
+    if missing:
+        print(f"[!] {len(missing)} expected feature(s) missing (will be NaN): {missing}")
+    if unexpected:
+        print(f"[i] {len(unexpected)} input key(s) not used by the models (e.g. {unexpected[:3]})")
+
+
+def unwrap_model(obj, path):
+    """
+    Some .joblib files store a dict bundle (e.g. {"model": ..., "threshold": ...})
+    instead of the bare estimator. Return the estimator plus any extra bundle contents.
+    """
+    if hasattr(obj, "predict"):
+        return obj, {}
+    if isinstance(obj, dict):
+        print(f"[i] {os.path.basename(path)} is a dict bundle with keys: {list(obj)}")
+        for key in ("model", "best_model", "estimator", "clf", "classifier", "regressor", "pipeline"):
+            if hasattr(obj.get(key), "predict"):
+                return obj[key], {k: v for k, v in obj.items() if k != key}
+        # Fall back to the first value that looks like a model
+        for key, val in obj.items():
+            if hasattr(val, "predict"):
+                return val, {k: v for k, v in obj.items() if k != key}
+    raise TypeError(f"No object with a .predict() method found in {path} (got {type(obj).__name__})")
+
+
+def run_choice(choice, stream_df, feature_cols):
+    label, task, horizon, model_dir, model_file, scaler_file = MODELS[choice]
+    model_path = os.path.join(BASE_DIR, model_dir, model_file)
+    model, extras = unwrap_model(joblib.load(model_path), model_path)
+    if extras:
+        # Show small extras (thresholds, settings) so you can check if any must be applied
+        summary = {k: v for k, v in extras.items() if isinstance(v, (int, float, str, bool))}
+        print(f"[i] Other values in bundle: {summary or list(extras)}")
+        # If the bundle has its own feature list, that's the order the model was trained on
+        for key in ("feature_cols", "features", "feature_names"):
+            if isinstance(extras.get(key), (list, tuple)):
+                feature_cols = list(extras[key])
+                break
+    scaler_dict = joblib.load(os.path.join(BASE_DIR, scaler_file))
+
+    # No horizon shift here: the input is already in the "(t-N)" lag format the
+    # models were trained on. The horizon is built into each model (h3 / h6).
+    if task == "classification":
+        return run_classification_model(stream_df, model, scaler_dict, feature_cols)
+    return run_regression_model(stream_df, model, scaler_dict, feature_cols, f"{horizon}-Hour")
 
 
 def main(my_stream_data):
-    feature_names = [
-        "sensor_turbidity","sensor_turbidity_lag1", "sensor_turbidity_lag2", "sensor_turbidity_lag3", "sensor_turbidity_lag4", "sensor_turbidity_lag5",
-        "sensor_turbidity_lag6", "sensor_turbidity_lag7", "sensor_turbidity_lag8", "sensor_turbidity_lag9", "sensor_turbidity_lag10",
-        "sensor_turbidity_lag11", "sensor_turbidity_lag12", "sensor_turbidity_lag13", "sensor_turbidity_lag14", "sensor_turbidity_lag15",
-        "sensor_turbidity_lag16", "sensor_turbidity_lag17", "sensor_turbidity_lag18", "sensor_turbidity_lag19", "sensor_turbidity_lag20",
-        "sensor_turbidity_lag21", "sensor_turbidity_lag22", "sensor_turbidity_lag23", "sensor_turbidity_lag24", "sensor_turbidity_lag25",
-        "sensor_turbidity_lag26", "sensor_turbidity_lag27", "sensor_turbidity_lag28", "sensor_turbidity_lag29", "sensor_turbidity_lag30",
-        "Hag_dis", "Hag_dis_lag1","Hag_dis_lag2",
-        "Hag_dis_lag3", "Hag_dis_lag4", "Hag_dis_lag5", "Hag_dis_lag6", "Hag_dis_lag7", "Hag_dis_lag8", "Hag_dis_lag9", "Hag_dis_lag10",
-        "Hag_dis_lag11", "Hag_dis_lag12", "Hag_dis_lag13", "Hag_dis_lag14", "Hag_dis_lag15", "Hag_dis_lag16", "Hag_dis_lag17", "Hag_dis_lag18",
-        "Hag_dis_lag19", "Hag_dis_lag20", "Hag_dis_lag21", "Hag_dis_lag22", "Hag_dis_lag23", "Hag_dis_lag24", "Hag_dis_lag25",
-        "Hag_dis_lag26", "Hag_dis_lag27", "Hag_dis_lag28", "Hag_dis_lag29", "Hag_dis_lag30",
-        "sensor_temperature","sensor_temperature_lag1",
-        "sensor_temperature_lag2", "sensor_temperature_lag3", "sensor_temperature_lag4", "sensor_temperature_lag5", "sensor_temperature_lag6",
-        "sensor_temperature_lag7", "sensor_temperature_lag8", "sensor_temperature_lag9", "sensor_temperature_lag10", "sensor_temperature_lag11",
-        "sensor_temperature_lag12", "sensor_temperature_lag13", "sensor_temperature_lag14", "sensor_temperature_lag15", "sensor_temperature_lag16",
-        "sensor_temperature_lag17", "sensor_temperature_lag18", "sensor_temperature_lag19", "sensor_temperature_lag20", "sensor_temperature_lag21",
-        "sensor_temperature_lag22", "sensor_temperature_lag23","sensor_temperature_lag24", "sensor_temperature_lag25",
-        "sensor_temperature_lag26", "sensor_temperature_lag27", "sensor_temperature_lag28", "sensor_temperature_lag29", "sensor_temperature_lag30",
-        "month", "month_lag1", "month_lag2", "month_lag3", "month_lag4",
-        "month_lag5", "month_lag6", "month_lag7", "month_lag8", "month_lag9", "month_lag10", "month_lag11", "month_lag12", "month_lag13", "month_lag14",
-        "month_lag15", "month_lag16", "month_lag17", "month_lag18", "month_lag19", "month_lag20", "month_lag21", "month_lag22", "month_lag23",
-        "month_lag24", "month_lag25", "month_lag26", "month_lag27", "month_lag28", "month_lag29", "month_lag30"
-    ]
-    my_stream_data=pd.DataFrame([my_stream_data],columns=feature_names)
-    # Shared base scaler directory
+    feature_cols = load_feature_cols()
+    check_feature_names(my_stream_data, feature_cols)
+    stream_df = pd.DataFrame([my_stream_data], columns=feature_cols)
 
-
+    result = None
     while True:
         print("\n=============================================")
         print("         MODEL SELECTION INTERFACE           ")
         print("=============================================")
-        print("1. Classification Model")
-        print("2. Regression Model (1 hour predictive Horizon)")
-        print("3. Regression Model (3 hours predictive Horizon)")
-        print("4. Regression Model (6 hours predictive Horizon)")
-        print("5. Exit")
+        for key, (label, *_rest) in MODELS.items():
+            print(f"{key}. {label}")
+        print(f"{EXIT_CHOICE}. Exit")
         print("=============================================")
 
-        choice = input("Select a model to run (1-5): ").strip()
+        choice = input(f"Select a model to run (1-{EXIT_CHOICE}): ").strip()
 
-        if choice == '1':
-            load_dir = "Sensorturb_12features_3_85"
-            model_name = "rfclass_sensorturb_12features_3_85.joblib"
-
-
-            feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
-            config = json.load(open(os.path.join(load_dir, "config.json")))
-            scaler_dict = joblib.load("scaler_dict.pkl")
-            rf_model = joblib.load(os.path.join(load_dir, model_name))
-
-
-            prepared_data = shift_features_for_horizon(my_stream_data, horizon_hours=3)
-            result = run_classification_model(prepared_data, rf_model, scaler_dict, feature_cols)
-            print(f"Result: {result}")
-
-        elif choice == '2':
-            load_dir = "Sensorturb_sensortemp_hagdis_month_24_1/"
-            model_name = "xgb_sensor_hagdis_month_24_1.joblib"
-
-            feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
-            config = json.load(open(os.path.join(load_dir, "config.json")))
-            scaler_dict = joblib.load("scaler_dict.pkl")
-            xgb_model = joblib.load(os.path.join(load_dir, model_name))
-
-            prepared_data = shift_features_for_horizon(my_stream_data, horizon_hours=1)
-            result = run_regression_model(prepared_data, xgb_model, scaler_dict, feature_cols, "1-Hour")
-            print(f"Result: {result}")
-
-        elif choice == '3':
-            load_dir = "Sensorturb_sensortemp_hagdis_month_24_3/"
-            model_name = "xgb_sensor_hagdis_month_24_3.joblib" # Verify if name should be _3.joblib
-
-            feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
-            config = json.load(open(os.path.join(load_dir, "config.json")))
-            scaler_dict = joblib.load("scaler_dict.pkl")
-            xgb_model = joblib.load(os.path.join(load_dir, model_name))
-
-            prepared_data = shift_features_for_horizon(my_stream_data, horizon_hours=3)
-            prepared_data = prepared_data.reindex(columns=feature_cols, fill_value=np.nan)
-            result = run_regression_model(prepared_data, xgb_model, scaler_dict, feature_cols, "3-Hour")
-            print(f"Result: {result}")
-
-        elif choice == '4':
-            load_dir = "Sensorturb_sensortemp_hagdis_18features_6/"
-            model_name = "xgb_sensorturb_sensortemp_hagdis_18features_6.joblib"
-
-            feature_cols = json.load(open(os.path.join(load_dir, "features.json")))
-            config = json.load(open(os.path.join(load_dir, "config.json")))
-            scaler_dict = joblib.load("scaler_dict.pkl")
-            xgb_model = joblib.load(os.path.join(load_dir, model_name))
-
-            prepared_data = shift_features_for_horizon(my_stream_data, horizon_hours=6)
-            # Ensure prepared_data is a DataFrame before passing it to run_regression_model
-            if isinstance(prepared_data, dict):
-                prepared_data = pd.DataFrame([prepared_data])
-            elif not isinstance(prepared_data, pd.DataFrame):
-                raise TypeError("Expected prepared_data to be a pandas DataFrame or a dictionary for a single row, but got type: " + str(type(prepared_data)))
-            # Ensure prepared_data has all expected feature_cols, adding NaN for missing ones
-            prepared_data = prepared_data.reindex(columns=feature_cols, fill_value=np.nan)
-            result = run_regression_model(prepared_data, xgb_model, scaler_dict, feature_cols, "6-Hour")
-            print(f"Result: {result}")
-
-        elif choice == '5':
+        if choice == EXIT_CHOICE:
             print("\nExiting interface. Goodbye!")
             break
+        if choice not in MODELS:
+            print(f"\n[!] Invalid choice. Please enter a number between 1 and {EXIT_CHOICE}.")
+            continue
 
-        else:
-            print("\n[!] Invalid choice. Please enter a number between 1 and 5.")
-            result = None
+        result = run_choice(choice, stream_df, feature_cols)
+        print(f"Result: {result}")
 
-        return result
+    return result  # last result produced before exiting (None if no model was run)
 
-# --- 3. EXECUTING THE SCRIPT ---
+
 if __name__ == "__main__":
-    # Your live dataset from a SCADA system, database, or API
+    # Live dataset from a SCADA system, database, or API.
+    # All keys use the same format: "<name> (t-<lag>)" — check against features.json.
     my_stream_data = {
-        "sensor_turbidity": 13.5, # Changed key name
-        "Hag_dis": 152.1,         # Changed key name
-        "sensor_temperature": 18.9, # Changed key name
-        "month": 5                # Changed key name
+        "sensor_turbidity (t-1)": 15.5,
+        "Hag_dis (t-1)": 152.1,
+        "sensor_temperature (t-1)": 18.9,
+        "Nieu_EC (t-1)": 3800000,
+        "Lob_turbidity (t-1)": 18.9,
+        "flow_direction (t-1)": 1,
+        "month (t-1)": 5,
     }
-    # (Populating lags for local script testing)
-    for i in range(1, 25): # Increased range to generate lags up to 30
-        my_stream_data[f"sensor_turbidity_lag{i}"] = 1.1 * i +0.23 + 13.5 # Changed key name
-        my_stream_data[f"Hag_dis_lag{i}"] = 0.98 * i - 0.12 + 152.1         # Changed key name
-        my_stream_data[f"sensor_temperature_lag{i}"] = 1.02 * i - 0.03 + 18.9 # Changed key name
-        my_stream_data[f"month_lag{i}"] = 5                          # Changed key name
+
+    # Generate synthetic lags t-2 ... t-24 for local testing
+    def lag(name, i):
+        return f"{name} (t-{i})"
+
+    for i in range(2, 25):
+        prev = lambda name: my_stream_data[lag(name, i - 1)]
+        my_stream_data[lag("sensor_turbidity", i)] = 1.01 * prev("sensor_turbidity") + 0.23
+        my_stream_data[lag("sensor_temperature", i)] = 0.98 * prev("sensor_temperature") - 0.18
+        my_stream_data[lag("Nieu_EC", i)] = 1.02 * prev("Nieu_EC") - 1823
+        my_stream_data[lag("Lob_turbidity", i)] = 1.02 * prev("Lob_turbidity") - 0.43
+        my_stream_data[lag("Hag_dis", i)] = 0.98 * prev("Hag_dis") - 0.12
+        my_stream_data[lag("month", i)] = 5
+        my_stream_data[lag("flow_direction", i)] = 1
 
     prediction_output = main(my_stream_data)
-
     print(f"\nFinal Processed Output: {prediction_output}")
